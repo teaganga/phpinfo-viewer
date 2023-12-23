@@ -97,7 +97,7 @@ function phpinfo_viewer_panel_display() {
     }    
 
     // Display a div for the logs
-    echo "<pre id='logOutput' style='overflow:auto;height:600px;margin-top:10px;'></pre>";
+    echo "<pre id='logOutput' style='overflow:auto;height:0px;margin-top:10px;'></pre>";
 
     // JavaScript function to fetch and display logs
     echo "<script>
@@ -106,6 +106,7 @@ function phpinfo_viewer_panel_display() {
             .then(response => response.text())
             .then(data => {
                 document.getElementById('logOutput').textContent = data;
+                logOutput.style.height = '600px'; 
             });
         }
     </script>";
@@ -119,6 +120,28 @@ function phpinfo_viewer_panel_display() {
 
     echo "</div>";
 }
+
+function wp_read_last_lines($filePath, $lines = 200) {
+    // Initialize the WordPress Filesystem API
+    global $wp_filesystem;
+    require_once(ABSPATH . '/wp-admin/includes/file.php');
+    WP_Filesystem();
+
+    // Check if the file is readable
+    if (!$wp_filesystem->is_readable($filePath)) {
+        return "File is not readable.";
+    }
+
+    // Read the file content into an array
+    $file_data = $wp_filesystem->get_contents_array($filePath);
+    $total_lines = count($file_data);
+    $start_line = max(0, $total_lines - $lines);
+
+    // Extract the last $lines lines
+    $output = implode("\n", array_slice($file_data, $start_line, $lines));
+    return $output;
+}
+
 
 // Use an action hook to handle log fetching
 add_action('admin_init', 'phpinfo_viewer_fetch_log_data');
@@ -140,9 +163,11 @@ function phpinfo_viewer_fetch_log_data() {
             echo $fileMessage; // If there's a message from the function, print it
             exit;
         } else {
-            $logData = shell_exec("tail -n 200 " . escapeshellarg($logPath));
+            //$logData = shell_exec("tail -n 200 " . escapeshellarg($logPath));
+            $logData = wp_read_last_lines($logPath, 200);
             echo nl2br($logData);
             exit;
         }
     }
 }
+
