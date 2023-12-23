@@ -2,7 +2,7 @@
 /*
 Plugin Name: phpinfo Viewer
 Description: A simple plugin to display phpinfo() in the WP admin area.
-Version: 0.9
+Version: 1.0
 Author: Teagan G.
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
