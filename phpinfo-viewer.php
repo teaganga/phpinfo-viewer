@@ -8,6 +8,7 @@ License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 */
 
+if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
 
 // Add a new menu item under Tools
 function phpinfo_viewer_panel_menu() {
@@ -32,6 +33,10 @@ function phpinfo_viewer_get_log_files($directory) {
 
 function phpinfo_viewer_file_availability_message($logPath) {
 
+    if ($logPath === false) {
+        return "Invalid log file path.";
+    }
+
     if (PHP_OS_FAMILY !== 'Windows' && is_link($logPath)) {
         $target = readlink($logPath);
         if (in_array($target, ['/dev/stdout', '/dev/stderr'])) {
@@ -47,7 +52,10 @@ function phpinfo_viewer_file_availability_message($logPath) {
         return "Log file is not readable.";
     }
 
-
+    // Optional: Check if the file extension is allowed
+    if (!in_array(pathinfo($logPath, PATHINFO_EXTENSION), ['log', 'txt'])) {
+        return "Access to this file type is not allowed.";
+    }
 
     return false;
 }
@@ -78,12 +86,14 @@ function phpinfo_viewer_panel_display() {
 
     // Display buttons for Apache logs
     foreach ($apache_logs as $log) {
-        echo "<button onclick=\"fetchLog('{$log}')\">Show " . basename($log) . " Logs</button> ";
+        $nonce = wp_create_nonce('phpinfo_viewer_nonce');
+        echo "<button onclick=\"fetchLog('{$log}', '{$nonce}')\">Show " . basename($log) . " Logs</button> ";
     }
 
     // Display buttons for Xdebug logs
     foreach ($xdebug_logs as $log) {
-        echo "<button onclick=\"fetchLog('{$log}')\">Show " . basename($log) . " Logs</button> ";
+        $nonce = wp_create_nonce('phpinfo_viewer_nonce');
+        echo "<button onclick=\"fetchLog('{$log}', '{$nonce}')\">Show " . basename($log) . " Logs</button> ";
     }    
 
     // Display a div for the logs
@@ -91,8 +101,8 @@ function phpinfo_viewer_panel_display() {
 
     // JavaScript function to fetch and display logs
     echo "<script>
-        function fetchLog(logPath) {
-            fetch('?page=phpinfo-viewer&logPath=' + encodeURIComponent(logPath))
+        function fetchLog(logPath, nonce) {
+            fetch('?page=phpinfo-viewer&logPath=' + encodeURIComponent(logPath) + '&_wpnonce=' + nonce)
             .then(response => response.text())
             .then(data => {
                 document.getElementById('logOutput').textContent = data;
@@ -113,8 +123,15 @@ function phpinfo_viewer_panel_display() {
 // Use an action hook to handle log fetching
 add_action('admin_init', 'phpinfo_viewer_fetch_log_data');
 function phpinfo_viewer_fetch_log_data() {
-    if (isset($_GET['page']) && $_GET['page'] === 'phpinfo-viewer' && current_user_can('manage_options') && isset($_GET['logPath'])) {
-        $logPath = filter_input(INPUT_GET, 'logPath', FILTER_SANITIZE_STRING);
+    if (isset($_GET['page']) && $_GET['page'] === 'phpinfo-viewer' && current_user_can('manage_options') && isset($_GET['logPath'])) 
+    {
+        // Verify the nonce
+        if (!wp_verify_nonce($_GET['_wpnonce'], 'phpinfo_viewer_nonce')) {
+            echo 'Security check failed.';
+//            exit;
+        }
+
+        $logPath = filter_input(INPUT_GET, 'logPath', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
         
         // Use the utility function to check the file availability
         $fileMessage = phpinfo_viewer_file_availability_message($logPath);
